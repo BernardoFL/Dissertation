@@ -1,0 +1,618 @@
+\chapter{Introduction}
+
+\section{The central question}
+\label{sec:intro:central}
+% =============================================================================
+
+Statistical inference is, at its core, a problem of rational learning.
+Given a sequence of observations, an agent must form beliefs about the
+world, update them as new data arrives, and act on them in a principled
+way.  Bayesian decision theory provides the normative framework for this
+process \citep{Wald1950, Savage1954, Berger1985}: beliefs are represented
+as probability distributions, updating follows Bayes' rule, and actions
+are chosen to minimize expected loss under the current belief state.  This
+framework is both a philosophical position; that uncertainty should be
+quantified probabilistically, and a practical decree for how
+inference algorithms should be built.
+
+This thesis studies three facets of Bayesian learning through the lens of
+Bayesian nonparametrics.  The first concerns dynamics: how should a
+Bayesian agent update its beliefs recursively, one observation at a time,
+and what geometric structure underlies that recursion. The second concerns compression: when the full dataset cannot be retained, what is the
+minimal summary that preserves the agent's predictive accuracy?  The third
+concerns pooling: when data arrive from multiple heterogeneous
+sources, how should the agent borrow strength across them without imposing
+unjustified parametric constraints.  Each question has a partial answer
+in the statistics literature; the implied
+posterior is not identified in the first case, exact inference scales
+poorly with~$n$ in the second, and parametric families impose unjustified
+homogeneity assumptions in the third, and in each case Bayesian
+nonparametric tools provide the language needed to sharpen and resolve the
+incompleteness.
+
+% =============================================================================
+\section{Bayesian learning as a decision-theoretic framework}
+\label{sec:intro:framework}
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+\subsection{Bayes' rule as optimal belief updating}
+\label{subsec:intro:bayes}
+% -----------------------------------------------------------------------------
+
+Let $x_{1:n} = (x_1, \ldots, x_n)$ denote a sequence of observations
+taking values in $\cX$, and let $G \in \cP(\Th)$ denote an unknown
+probability measure on a parameter space $\Th$, indexed by a family of
+likelihoods $\{k(\,\cdot\mid\theta)\}_{\theta\in\Th}$.  A Bayesian agent
+begins with a prior $\pi(G)$ encoding initial beliefs about $G$ and
+updates it upon observing $x_{1:n}$ to obtain the posterior
+\begin{equation}
+  \pi(G \mid x_{1:n})
+  \;\propto\;
+  \pi(G)\; p(x_{1:n} \mid G),
+  \label{eq:bayes-rule}
+\end{equation}
+where $p(x_{1:n} \mid G) = \int \prod_{i=1}^{n} k(x_i \mid \theta)\,
+G(d\theta)$ under the exchangeable i.i.d.\ assumption, which we relax in
+Section~\ref{subsec:intro:definetti}.  An alternative view from the optimization persective is Donsker-Varadhan's formula \citep{donskervaradhan}. It states that the posterior is the unique belief
+state minimising the expected Kullback--Leibler divergence from the true
+data-generating distribution, subject to the prior as a regularizer
+\citep{Zellner1988},
+\begin{equation}
+  \pi(\,\cdot\mid x_{1:n})
+  \;=\;
+  \argmin_{Q\,\in\,\cP(\cP(\Th))}
+  \bE_Q\!\left[-\log p(x_{1:n}\mid G)\right]
+  + \KL{Q}{\pi}.
+  \label{eq:bayes-variational}
+\end{equation}
+This variational characterization of the posterior provides
+the language for judging approximate inference algorithms. Making that
+implicit objective explicit situates them from a Bayesian perspective,
+and it is the lens through which we analyze Newton's recursion in
+Chapter~\ref{chap:gradientflows}.
+
+% -----------------------------------------------------------------------------
+\subsection{The predictive view of Bayesian inference}
+\label{subsec:intro:predictive}
+% -----------------------------------------------------------------------------
+
+The posterior $\pi(G \mid x_{1:n})$ is the conventional object of Bayesian
+inference, but it is not the only complete characterization.  An equivalent
+and in many ways more fundamental representation operates entirely at the
+level of observables, without reference to the prior $\pi$. The
+sequence of one-step-ahead predictive distributions,
+\begin{equation}
+  p(x_{n+1} \mid x_{1:n})
+  \;=\;
+  \int k(x_{n+1} \mid \theta)\;
+  \pi(d\theta \mid x_{1:n}),
+  \qquad n = 0, 1, 2, \ldots,
+  \label{eq:predictive}
+\end{equation}
+completely determines the posterior under regularity conditions: given the
+full sequence of predictives, one can recover $\pi(d\theta \mid x_{1:n})$ for
+any $n$ \citep[Theorem~1]{FongHolmesWalker2023}.   The
+Bayesian agent's beliefs about $\theta$ are entirely expressed in its
+predictions about future data; the posterior contains no inferential
+content beyond what the predictive sequence already encodes in the sense
+that the posterior is the almost sure limit of the sequence of empirical
+measures induced by the predictives as $n \to \infty$.
+
+This predictive-first perspective decouples inference from the
+specification of a parameter space $\Th$, which may be
+infinite-dimensional or not explicitly given, and provides a clean
+decision-theoretic criterion for evaluating approximations: an approximate
+posterior is assessable by whether it produces accurate predictive
+distributions, a criterion that is empirically measurable and connects
+naturally to prequential scoring rules \citep{Dawid1984}.
+
+% -----------------------------------------------------------------------------
+\subsection{Martingale posteriors and posterior-free inference}
+\label{subsec:intro:martingale}
+% -----------------------------------------------------------------------------
+
+The predictive-first view raises a natural question: must a valid Bayesian
+analysis begin with a prior and derive predictives, or can predictives be
+specified directly with the posterior as the derived object?
+\citet{FongHolmesWalker2020} and \citet{WalkerHolmes2024} answer this
+affirmatively.  A sequence of predictive distributions
+$\{p(x_{n+1} \mid x_{1:n})\}_{n \geq 0}$ satisfying exchangeability of
+the induced joint distribution over $(x_1, x_2, \ldots)$ and a martingale
+condition on the sequence of induced mixing measures, namely that
+$\bE[G_{n+1} \mid x_{1:n}] = G_n$ a.s., defines a valid
+posterior without requiring an explicit prior specification.  The posterior
+becomes a derived object: it is the almost sure limit $G_\infty =
+\lim_{n\to\infty} G_n$ of the induced sequence of mixing measures, rather
+than the starting point of the analysis.
+
+This martingale posterior framework has a direct bearing on
+Chapter~\ref{chap:gradientflows}.  Newton's recursion can be reinterpreted
+as a specification of predictive distributions: at each step, $G_{n+1}$ is
+the mixing measure that reweights the current estimate $G_n$ by the
+likelihood of the new observation $x_{n+1}$.  The gradient flow analysis
+in Chapter~\ref{chap:gradientflows} reveals which objective this predictive
+sequence implicitly optimises, and identifies the posterior (if any(
+that it targets.  As we will show, whether Newton's recursion defines a
+valid martingale posterior depends critically on whether a prior
+regularisation term is included in the objective.
+
+% -----------------------------------------------------------------------------
+\subsection{Sequential learning and the cost of forgetting}
+\label{subsec:intro:compression}
+% -----------------------------------------------------------------------------
+
+A Bayesian agent processing a stream of observations $x_1, x_2, \ldots$
+ideally retains the full posterior $\pi(G \mid x_{1:n})$ at each step.  In
+parametric models this is feasible: the posterior is summaried by a
+finite-dimensional sufficient statistic and storage costs are bounded.  In
+nonparametric models, however, the posterior grows with $n$, the DP
+posterior after $n$ observations is a random measure supported on a space
+whose combinatorial complexity grows like the Bell number $B_n$, which is
+super exponential in $n$ \citep{Rota1964}.  For large $n$, exact
+sequential inference becomes computationally prohibitive.
+
+This creates a fundamental tension at the heart of Bayesian nonparametrics: the expressiveness of the model, its ability to grow in
+complexity with the data, is precisely what makes it expensive to
+implement.  The natural question is whether the full posterior can be
+replaced by a compressed summary that preserves predictive accuracy.  A
+coreset is such a summary: a weighted subsample
+$(x_{i_1}, w_1), \ldots, (x_{i_m}, w_m)$ of size $m \ll n$, ideally with
+$m$ growing sublinearly in $n$, such that the posterior computed on the
+coreset approximates the posterior on the full dataset.  Standard coreset
+constructions designed for parametric models, \emph{c.f.} \citep{HugginsCampbellBroderick2016, CampbellBroderick2018}, are not well suited for non-Euclidean observations (like partitions) because they ignore the underlying topology.  Predictive matching, the approach developed in
+Chapter~\ref{chap:coresets}, addresses this by defining coreset quality
+directly in terms of the one-step-ahead predictive distributions,
+connecting the compression problem back to the framework of
+Section~\ref{subsec:intro:predictive}.
+
+% =============================================================================
+\section{Bayesian nonparametrics}
+\label{sec:intro:bnp}
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+\subsection{Why nonparametrics?}
+\label{subsec:intro:whybnp}
+% -----------------------------------------------------------------------------
+
+A parametric model assumes that the data-generating distribution belongs
+to a family $\{p(\,\cdot\mid\theta) : \theta \in \mathbb{R}^d\}$ indexed
+by a finite-dimensional parameter.  This is a strong assumption: it
+requires the analyst to commit, before seeing the data, to a functional
+form for the likelihood.  When this form is misspecified, posterior
+inference can be systematically biased in ways that do not vanish as $n
+\to \infty$ --- a phenomenon documented rigorously by \citet{Freedman1963}
+in the context of Bayes estimators under model misspecification, and of
+practical concern in density estimation, clustering, and survival
+analysis.  Nonparametric models address this by letting complexity grow
+with the data: the unknown object is a distribution, a density, or a
+partition, and the prior is placed directly over the relevant
+infinite-dimensional space.
+
+It is worth noting that this nonparametric perspective is not confined to
+the Bayesian tradition.  In machine learning, deep neural networks with
+sufficiently many parameters effectively define nonparametric models over
+function spaces --- in the infinite-width limit they converge to Gaussian
+processes \citep{Neal1996, LeeEtAl2018}, and their implicit priors are
+determined by architecture and initialisation rather than deliberate
+specification.  The difference between deep learning and BNP is one of
+intention: BNP chooses infinite-dimensional priors deliberately, with
+known properties and principled update rules, while deep learning arrives
+at nonparametric behaviour as an emergent consequence of scale.  The gap
+between these two traditions --- powerful implicit priors on one side,
+principled explicit priors on the other --- is one of the central open
+tensions in modern statistics and machine learning.  This thesis works
+squarely within the BNP tradition, though the gradient flow framework
+developed in Chapter~\ref{chap:gradientflows} connects naturally to
+gradient-based training of neural networks and may speak to both sides.
+
+% -----------------------------------------------------------------------------
+\subsection{De Finetti's theorem}
+\label{subsec:intro:definetti}
+% -----------------------------------------------------------------------------
+
+The foundational justification for placing a prior over an
+infinite-dimensional space comes not from subjective probability but from a
+structural property of the observations themselves.  A sequence of random
+variables $x_1, x_2, \ldots$ taking values in a Polish space $\cX$ is
+exchangeable if its joint distribution is invariant under finite
+permutations: $(x_1, \ldots, x_n) \eqd (x_{\sigma(1)}, \ldots,
+x_{\sigma(n)})$ for all $n \geq 1$ and all permutations $\sigma$ of $[n]$.
+De Finetti's theorem \citep{deFinetti1937, HewittSavage1955} states that
+any infinite exchangeable sequence on a Polish space admits the
+representation
+\begin{equation}
+  p(x_{1:n})
+  \;=\;
+  \int \prod_{i=1}^{n} p(x_i \mid G)\; \pi(dG),
+  \label{eq:definetti}
+\end{equation}
+where $\pi$ is a probability measure on $\cP(\cX)$ and the product form
+holds for $\pi$-almost every $G$.  The measure $\pi$ is unique and equals
+the almost-sure weak limit of the empirical measures $\frac{1}{n}
+\sum_{i=1}^n \delta_{x_i}$, which is a statement about the concentration
+of the posterior around the truth rather than a definition of $\pi$
+itself.
+
+Exchangeability is a condition on the agent's beliefs, not on the
+data-generating process< it expresses that the agent has no prior
+information distinguishing one observation index from another.  Under this
+condition, any coherent exchangeable
+belief system must be representable as a mixture of i.i.d.\ processes, and
+$\pi$ is the mixing distribution.  BNP is thus not an approximation to
+some true parametric model but the natural consequence of exchangeable
+uncertainty about an unknown distribution $G$.  Extensions to partial
+exchangeability, where observations are exchangeable within groups but
+not across them, are developed by \citet{Kingman1978} and
+\citet{Aldous1985}, and are relevant to the random partition setting of
+Chapter~\ref{chap:coresets}, where exchangeability holds within clusters
+but the partition structure itself introduces between-cluster dependence.
+
+% -----------------------------------------------------------------------------
+\subsection{The Dirichlet process}
+\label{subsec:intro:dp}
+% -----------------------------------------------------------------------------
+
+The Dirichlet process \citep{Ferguson1973} is the canonical prior over
+$\cP(\cX)$ on a Polish space $\cX$.  It is parameterised by a
+concentration parameter $\alpha > 0$ and a base measure $H \in \cP(\cX)$,
+written $G \sim \DP{\alpha}{H}$, and defined by the requirement that for
+any finite measurable partition $\{A_1, \ldots, A_k\}$ of $\cX$,
+\begin{equation}
+  \bigl(G(A_1), \ldots, G(A_k)\bigr)
+  \;\sim\;
+  \Dir\!\bigl(\alpha H(A_1), \ldots, \alpha H(A_k)\bigr).
+  \label{eq:dp-def}
+\end{equation}
+The existence of such a process on $\cP(\cX)$ follows from Kolmogorov's
+extension theorem applied to the projective system of finite-dimensional
+Dirichlet distributions \citep[Theorem~1]{Ferguson1973}.  The base measure
+$H$ is the prior mean --- $\bE[G(A)] = H(A)$ for all measurable $A$ ---
+while $\alpha$ controls concentration around $H$: as $\alpha \to \infty$,
+$G \to H$ almost surely, while small $\alpha$ allows $G$ to differ
+substantially from $H$.
+
+The DP has two properties central to its use in practice.  First, it is
+conjugate to i.i.d.\ sampling: if $\theta_1, \ldots, \theta_n \mid G \iid
+G$ and $G \sim \DP{\alpha}{H}$, then
+\begin{equation}
+  G \mid \theta_{1:n}
+  \;\sim\;
+  \DP{\alpha + n}{\,\dfrac{\alpha H + \sum_{i=1}^{n} \delta_{\theta_i}}{\alpha + n}},
+  \label{eq:dp-posterior}
+\end{equation}
+where $\bigl(\alpha H + \sum_{i=1}^n \delta_{\theta_i}\bigr)/(\alpha+n)$
+denotes a probability measure --- a convex combination of $H$ and the
+empirical measure $n^{-1}\sum_i \delta_{\theta_i}$.  Second, realisations
+of the DP are almost surely discrete: $G = \sum_{k=1}^\infty w_k
+\delta_{\theta_k^*}$, where the weights follow the stick-breaking
+construction
+\begin{equation}
+  w_k = v_k \prod_{j=1}^{k-1}(1 - v_j),
+  \qquad
+  v_k \iid \Beta(1, \alpha),
+  \label{eq:stick-breaking}
+\end{equation}
+due to \citet{Sethuraman1994}.  This almost-sure discreteness induces a
+natural clustering structure: observations sharing the same atom
+$\theta_k^*$ are grouped into a cluster, and the predictive probability of
+joining cluster $k$ is proportional to its current size --- a property
+formalised by the P\'{o}lya urn scheme of
+Section~\ref{subsec:intro:predictive-bnp}.
+
+% -----------------------------------------------------------------------------
+\subsection{Random partitions and species sampling models}
+\label{subsec:intro:partitions}
+% -----------------------------------------------------------------------------
+
+The almost-sure discreteness of the DP established in
+Section~\ref{subsec:intro:dp} has a combinatorial consequence.  When
+$\theta_1, \ldots, \theta_n \mid G \iid G$ and $G \sim \DP{\alpha}{H}$,
+repeated values occur with positive probability because $G$ is almost
+surely discrete.  These repetitions define a random partition $\rho_n$ of
+$[n] = \{1, \ldots, n\}$: indices $i$ and $j$ belong to the same block if
+and only if $\theta_i = \theta_j$, which is well-defined by the almost-sure
+discreteness established in Section~\ref{subsec:intro:dp}.  The first
+observation always starts a new block; thereafter, given $\rho_n$ with
+blocks of sizes $n_1, \ldots, n_\ell$, the $(n+1)$-th observation joins
+block $k$ with probability $n_k / (\alpha + n)$ or starts a new block with
+probability $\alpha / (\alpha + n)$.  This is the Chinese restaurant
+process \citep{Aldous1985, Pitman2006}.
+
+The CRP is an instance of a \emph{species sampling model} \citep{Pitman1996}:
+an exchangeable random partition whose distribution is characterised by its
+exchangeable partition probability function (EPPF) $\Pi_n(n_1, \ldots,
+n_\ell)$, which depends on the partition only through the multiset of block
+sizes $\{n_1, \ldots, n_\ell\}$, independently of which indices belong to
+which block.  For the DP the EPPF takes the form
+\begin{equation}
+  \Pi_n(n_1, \ldots, n_\ell)
+  \;=\;
+  \frac{\alpha^\ell}{\alpha^{(n)}}
+  \prod_{j=1}^{\ell} (n_j - 1)!,
+  \label{eq:dp-eppf}
+\end{equation}
+where $\alpha^{(n)} = \prod_{j=0}^{n-1}(\alpha + j)$ is the rising
+factorial and $(n_j - 1)! = \Gamma(n_j)$, which equals $1$ when $n_j = 1$
+as required for a singleton block.  More general EPPFs, such as those of
+the two-parameter Pitman--Yor process \citep{PitmanYor1997} with parameters
+$(\alpha, \sigma) \in (-\sigma, \infty) \times [0, 1)$, produce
+heavier-tailed cluster size distributions and arise naturally in linguistic
+and genetic applications \citep{Teh2006, FavaroLijoiPrunster2012}.  The
+EPPF is the central object in Chapter~\ref{chap:coresets}: the coreset
+construction developed there is designed to preserve the EPPF of the full
+dataset --- specifically its exchangeability structure and the recursive
+product form that determines how cluster sizes grow with $n$ --- within a
+weighted subsample of size $m \ll n$.
+
+% -----------------------------------------------------------------------------
+\subsection{Predictive characterisation of BNP models}
+\label{subsec:intro:predictive-bnp}
+% -----------------------------------------------------------------------------
+
+Every Bayesian nonparametric model has a predictive representation, and for
+many models this representation is more natural than the prior itself.  For
+the Dirichlet process, the predictive distribution of $\theta_{n+1}$ given
+$\theta_{1:n}$ --- obtained by marginalising $G$ out of $k(\theta_{n+1}
+\mid G)$ against the posterior $\pi(G \mid \theta_{1:n})$ --- is the
+P\'{o}lya urn scheme \citep{BlackwellMacQueen1973}:
+\begin{equation}
+  \theta_{n+1} \mid \theta_{1:n}
+  \;\sim\;
+  \frac{\alpha}{\alpha + n}\, H
+  \;+\;
+  \frac{1}{\alpha + n} \sum_{i=1}^{n} \delta_{\theta_i}.
+  \label{eq:polya-urn}
+\end{equation}
+With probability $\alpha/(\alpha + n)$ the new observation draws a
+genuinely new value from $H$, and with probability $n/(\alpha + n)$ it
+repeats one of the previous values, chosen uniformly.  Applied
+sequentially, this rule generates the full joint distribution of
+$(\theta_1, \theta_2, \ldots)$: the partition induced by repetitions is
+exactly the CRP of Section~\ref{subsec:intro:partitions}, and the posterior
+update~\eqref{eq:dp-posterior} is recoverable from the predictive
+weights \citep{BlackwellMacQueen1973}.
+
+The deeper point is that this connection runs in both directions.
+\citet{FortiniPetrone2012} and \citet{FongHolmesWalker2023} establish that
+the predictive sequence completely determines the posterior, the prior, and
+the EPPF: all inferential content of the DP is encoded in the P\'{o}lya
+urn rule, and no additional information is contained in the posterior given
+the full predictive sequence.  Specifying a BNP model is therefore
+equivalent to specifying a coherent sequence of one-step-ahead predictive
+distributions, and the posterior is the derived object obtained by taking
+the almost-sure limit of the induced empirical measures.  Different BNP
+models correspond to different predictive rules: the normalised
+inverse-Gaussian process \citep{LijoiMenaPrunster2005}, the Pitman--Yor
+process \citep{PitmanYor1997}, and the two-parameter Poisson--Dirichlet
+family \citep{Pitman2006} each encode different assumptions about tail
+behaviour through their predictive weights.  Newton's recursion, analysed
+in Chapter~\ref{chap:gradientflows}, is a predictive rule of this type ---
+the gradient flow analysis reveals which posterior, if any, its predictive
+sequence targets.
+
+% -----------------------------------------------------------------------------
+\subsection{P\'{o}lya trees}
+\label{subsec:intro:polytrees}
+% -----------------------------------------------------------------------------
+
+While the Dirichlet process places a prior over discrete distributions,
+many inferential problems require a prior over absolutely continuous
+distributions --- density estimation, goodness-of-fit testing, and the
+meta-analysis of Chapter~\ref{chap:metaanalysis}, where the object of
+interest is a population of smooth densities.  The P\'{o}lya tree
+\citep{Lavine1992, MauldinSudderethWilliams1992} addresses this by
+constructing a prior over densities through a recursive binary partitioning
+of the sample space.
+
+Formally, let $\cB = \{B_\varepsilon : \varepsilon \in \{0,1\}^*\}$ be a
+nested binary partition of $\cX$, where each node $\varepsilon$ at level
+$|\varepsilon|$ is split into left child $B_{\varepsilon 0}$ and right
+child $B_{\varepsilon 1}$.  A P\'{o}lya tree prior $\PT{\cB}{\cA}$ assigns
+to each internal node $\varepsilon$ an independent Beta random variable
+$Y_\varepsilon \sim \Beta(\alpha_{\varepsilon 0}, \alpha_{\varepsilon 1})$,
+where $\cA = \{\alpha_{\varepsilon j}\}$ is the collection of
+hyperparameters.  The conditional probability of $B_{\varepsilon 0}$ given
+$B_\varepsilon$ is $Y_\varepsilon$, and of $B_{\varepsilon 1}$ given
+$B_\varepsilon$ is $1 - Y_\varepsilon$.  When the hyperparameters grow
+sufficiently fast with depth --- specifically when $\alpha_{\varepsilon 0}
++ \alpha_{\varepsilon 1} \geq c \cdot |\varepsilon|^2$ for some $c > 0$
+\citep{Lavine1992} --- the resulting distribution is almost surely
+absolutely continuous.  Intuitively, making the Beta parameters grow with
+depth forces the distribution to spread mass smoothly across the partition,
+preventing concentration on a countable set of atoms, a property the DP
+does not share.
+
+P\'{o}lya trees are conjugate: observing $x_1, \ldots, x_n$ updates each
+$\Beta(\alpha_{\varepsilon 0}, \alpha_{\varepsilon 1})$ to
+$\Beta(\alpha_{\varepsilon 0} + n_{\varepsilon 0},\; \alpha_{\varepsilon 1}
++ n_{\varepsilon 1})$, where $n_{\varepsilon j}$ counts observations in
+$B_{\varepsilon j}$.  This update is exact and closed-form for any finite
+truncation of the tree, and yields closed-form marginal likelihoods
+\citep{BergerGuglielmi2001, HolmesChoudhuriBhattacharya2003} --- a
+property particularly valuable for the model selection and model averaging
+computations in Chapter~\ref{chap:metaanalysis}.  In
+Chapter~\ref{chap:metaanalysis} a finite-depth truncation is used with
+depth chosen to balance approximation error against computational cost,
+following the adaptive truncation strategy of
+\citet{TrippaHolmesJohnson2011}.  The DP handles the combinatorial
+question of which studies share a common data-generating density, while the
+P\'{o}lya tree handles the continuous question of what that density looks
+like, without committing to a parametric family.
+
+% =============================================================================
+\section{The three papers}
+\label{sec:intro:papers}
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+\subsection{Paper~1 --- Learning dynamically: recursive estimation via gradient flows}
+\label{subsec:intro:paper1}
+% -----------------------------------------------------------------------------
+
+Newton's algorithm \citep{NewtonRaftery1994} is a sequential estimator for
+mixture models: given a current estimate $G_n \in \cP(\Th)$ of the mixing
+measure, the update
+\begin{equation}
+  G_{n+1}(d\theta)
+  \;=\;
+  (1 - \alpha_n)\, G_n(d\theta)
+  \;+\;
+  \alpha_n\,
+  \frac{k(x_{n+1}, \theta)\, G_n(d\theta)}
+       {\displaystyle\int k(x_{n+1}, \theta)\, G_n(d\theta)}
+  \label{eq:newton-recursion}
+\end{equation}
+incorporates the new observation $x_{n+1}$ through a likelihood-weighted
+reweighting of the current estimate.  The algorithm is computationally
+attractive and has been shown to converge almost surely to the true mixing
+measure under conditions including correct model specification and a
+decreasing step-size sequence satisfying $\sum_n \alpha_n = \infty$ and
+$\sum_n \alpha_n^2 < \infty$ \citep{TokdarMartinGhosh2009}.  Yet its
+Bayesian interpretation has remained unclear: \citet{FortiniPetrone2020}
+establish that no choice of $\alpha_n$ makes $G_n$ equal to the posterior
+mean $\bE[G \mid x_{1:n}]$ under any species sampling prior, and the
+predictive sequence induced by Newton's recursion does not in general
+satisfy the martingale property required for a valid martingale posterior.
+
+Chapter~\ref{chap:gradientflows} resolves this by establishing that
+Newton's recursion is the forward Euler discretisation of the Fisher-Rao
+gradient flow of the marginal log-likelihood
+\begin{equation}
+  \cF(G \mid x_t)
+  \;=\;
+  -\log \int k(x_t, \theta)\, G(d\theta),
+  \label{eq:marginal-loglik}
+\end{equation}
+a functional on $(\cP(\Th), \dH)$ where $\dH$ denotes the Hellinger
+metric.  This identification has three consequences.  First, it provides a
+decision-theoretic interpretation: Newton minimises a sequential prediction
+loss, and the step sizes $\alpha_n$ control the discretisation error, not
+the prior strength.  Second, it explains why prior centring fails: the
+objective $\cF$ contains no prior term, so no choice of $\alpha_n$ can
+make $G_n$ track the posterior mean under a non-trivial prior $\pi$.
+Third, it suggests a principled fix: augmenting $\cF$ with a divergence
+term $\lambda\, D(G \,\|\, \pi)$ recovers a generalised variational
+inference problem \citep{KnoblauchJewsonDamoulas2022} over the
+Wasserstein--Fisher-Rao geometry, whose particle system implementation
+converges to a better-calibrated estimate and explores the parameter space
+more thoroughly at small sample sizes.  The gradient flow language further
+unifies Newton's recursion with martingale posteriors and score-based
+sequences \citep{WalkerHolmes2024}, which
+Chapter~\ref{chap:gradientflows} identifies as gradient flows under
+different metrics on $\cP(\Th)$, each corresponding to a different implicit
+loss function in the decision-theoretic framework of
+Section~\ref{subsec:intro:bayes}.
+
+% -----------------------------------------------------------------------------
+\subsection{Paper~2 --- Learning efficiently: coresets for random partitions}
+\label{subsec:intro:paper2}
+% -----------------------------------------------------------------------------
+
+Coreset construction is the problem of finding a small weighted subsample
+of the data such that inference on the coreset approximates inference on
+the full dataset.  For parametric exponential family models, coresets can
+be constructed by sensitivity sampling --- assigning each observation an
+importance weight proportional to its maximum influence on the
+log-likelihood --- with approximation guarantees scaling as $O(\log n /
+\varepsilon^2)$ in the coreset size \citep{HugginsCampbellBroderick2016,
+CampbellBroderick2018}.  For Bayesian nonparametric models with
+exchangeable random partition structure, these constructions fail: the
+log-likelihood does not decompose as a sum of independent per-observation
+terms, because the probability of any observation depends on which cluster
+it joins, which in turn depends on all other observations through the EPPF.
+Standard sensitivity weights, derived from individual likelihoods, cannot
+capture this dependence and produce coreset posteriors whose cluster size
+distributions diverge from those of the full-data posterior.
+
+Chapter~\ref{chap:coresets} develops a coreset construction for species
+sampling models based on predictive matching.  The criterion is
+decision-theoretic: a weighted subsample $(x_{i_1}, w_1), \ldots,
+(x_{i_m}, w_m)$ is a valid coreset if the predictive sequence it induces
+approximates the predictive sequence of the full data to accuracy
+$\varepsilon$ in a suitable divergence, with the coreset size $m$ growing
+sublinearly in $n$.  This criterion connects directly to
+Section~\ref{subsec:intro:predictive}: a Bayesian learner that has
+compressed its data to a coreset makes the same predictions as one that has
+retained everything, up to controlled error.  The construction exploits the
+exchangeability of the EPPF and its recursive product form, which together
+determine how the cluster size distribution must be preserved in the
+subsample to maintain predictive accuracy across all $n$ steps.
+
+% -----------------------------------------------------------------------------
+\subsection{Paper~3 --- Learning across studies: meta-analysis via DP mixtures of P\'{o}lya trees}
+\label{subsec:intro:paper3}
+% -----------------------------------------------------------------------------
+
+Meta-analysis is the problem of combining evidence from multiple
+independent studies to draw inference about a common underlying
+phenomenon.  The canonical parametric approach --- the
+DerSimonian--Laird random effects model \citep{DerSimonianLaird1986} ---
+assumes that study-level effects are drawn from a Gaussian distribution,
+an assumption that is routinely violated in practice: studies differ in
+population characteristics, measurement protocols, and outcome definitions
+in ways that produce non-Gaussian and often multimodal heterogeneity
+\citep{HigginsThompson2002, TurnerEtAl2012}.  Forcing a Gaussian model on
+this heterogeneity can produce pooled estimates that do not correspond to
+any study's population and confidence intervals that are systematically too
+narrow.
+
+Chapter~\ref{chap:metaanalysis} proposes a nonparametric approach based on
+Dirichlet process mixtures of P\'{o}lya trees.  Each study $j$ generates
+data from an unknown density $f_j \in \cF$, and the collection
+$(f_1, f_2, \ldots)$ is modelled as i.i.d.\ draws from an unknown
+distribution $\cQ$ over the space of densities $\cF$, with $\cQ \sim
+\DP{\alpha}{\cQ_0}$ where $\cQ_0$ is a base measure on $\cF$ given by a
+P\'{o}lya tree prior $\PT{\cB}{\cA}$.  The inferential targets are the
+cluster assignments of studies, the pooled density within each cluster, and
+the between-study heterogeneity as characterised by the distribution $\cQ$.
+The DP prior on $\cQ$ handles the combinatorial question of which studies
+share a common data-generating density, without requiring the number of
+clusters to be specified in advance.  Within each cluster, the P\'{o}lya
+tree prior on $f_j$ allows flexible density estimation without parametric
+constraints, while conjugacy enables closed-form marginal likelihoods at
+each node of the tree.  The model is applied to a collection of $k$
+randomised controlled trials from \texttt{[dataset]}, providing
+\texttt{[main substantive finding]}.
+
+% =============================================================================
+\section{Thesis roadmap}
+\label{sec:intro:roadmap}
+% =============================================================================
+
+This thesis is organised as follows.
+Chapter~\ref{chap:gradientflows} develops the gradient flow theory for
+recursive mixture estimation.  The main result is that Newton's algorithm
+is the forward Euler discretisation of the Fisher-Rao gradient flow of the
+marginal log-likelihood on $(\cP(\Th), \dH)$; the reader should take away
+that the gradient flow language provides a decision-theoretic foundation
+for recursive estimators and a principled route to incorporating prior
+information.
+Chapter~\ref{chap:coresets} develops a coreset theory for species sampling
+models based on predictive matching.  The main result is a construction
+that preserves the EPPF of the full dataset within a weighted subsample of
+sublinear size; the reader should take away that Bayesian compression for
+partition models requires a predictive criterion rather than a
+likelihood-based one.
+Chapter~\ref{chap:metaanalysis} develops a DP mixture of P\'{o}lya trees
+model for nonparametric meta-analysis and applies it to \texttt{[dataset]}.
+The main result is a fully nonparametric pooling procedure that clusters
+studies and estimates within-cluster densities without parametric
+constraints; the reader should take away that nonparametric priors can
+resolve the heterogeneity misspecification problem that affects standard
+random effects models.
+Chapter~\ref{chap:conclusions} concludes with a discussion of open
+problems, including the extension of the gradient flow framework to other
+BNP models, the development of adaptive coreset constructions that update
+online, and the use of infinite-dimensional priors as regularisers in
+large-scale machine learning.  We do not address model selection across the
+three frameworks, nor do we provide a unified computational implementation;
+these remain open directions.
+
+% =============================================================================
+% Bibliography
+% =============================================================================
+% \printbibliography   % uncomment when .bib file is attached
+
+\end{document}
